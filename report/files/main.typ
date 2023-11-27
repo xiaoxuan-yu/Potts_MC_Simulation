@@ -117,7 +117,7 @@ where $k_B$ is the Boltzmann constant and $q$ is the number of spin states. In t
 = Problem setup
 In the simulation, a 2D square lattice with periodic boundary is used as the target system. The lattice has size $N = 32$. For simplicity, we set the coupling constant $J = 1$ and the magnetic field strength $h = 0$. Besides we use the reduced temperature s.t. $k_B = 1$. $q$ is set to 3, which means the spin variable can take on 3 different values, 1, 2, and 3. 
 
-The initial state of the system is randomly generated. The simulation is performed under different reduced temperatures $T$ from 0.5 to 2.5. For each temperature, the system is evolved for 500,0000 steps. The trajectory of the system is recorded every 100 steps and thus the physical quantities are calculated with the same interval.
+The initial state of the system is randomly generated. The simulation is performed under different reduced temperatures $T$ from 0.5 to 2.5. For each temperature, the system is evolved for 10,000,000 steps. The trajectory of the system is recorded every 1,000 steps and thus the physical quantities are calculated with the same interval.
 
 We selected the last half of the trajectory for analysis. The first half of the trajectory is used to ensure the system has reached equilibrium. The physical quantities are calculated by averaging over the last half of the trajectory.
 

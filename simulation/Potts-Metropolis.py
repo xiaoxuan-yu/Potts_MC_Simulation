@@ -2,60 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from functools import partial
 from numba import njit, prange, objmode, jit
+from tqdm import trange
 
 
 # Finding neighbors in PBC
 @jit
 def finding_neighbor(N, i, j):
     return [((i + 1) % N, j), ((1 - i) % N, j), (i, (j + 1) % N), (i, (j - 1) % N)]
-
-
-# setup of 2D q-state Potts model
-@njit
-def potts_energy(spins, J, h):
-    """计算Potts模型的能量
-
-    Args:
-        spins: 自旋状态,shape=(N, N)的数组,其中N是格子数目
-        J: 相邻自旋互相作用能量强度
-        h: 外磁场强度
-
-    Returns:
-        系统总能量,标量
-    """
-
-    # 获取形状
-    N = spins.shape[0]
-
-    # 计算相邻自旋互作用能
-    E_J = J * np.sum(spins == np.roll(spins, 1, 0))
-    E_J += J * np.sum(spins == np.roll(spins, 1, 1))
-    # 计算外磁场能
-    E_J += h * np.sum(spins)
-
-    # 求和得到能量
-    E = -E_J
-    return E
-
-
-# magnetization
-@njit
-def potts_magnetization(spins):
-    """计算Potts模型的磁化强度
-
-    Args:
-        spins: 自旋状态,shape=(N, N)的数组,其中N是格子数目
-
-    Returns:
-        系统磁化强度,标量
-    """
-
-    # 获取形状
-    N = spins.shape[0]
-
-    # 计算磁化强度
-    M = np.sum(spins) / N**2
-    return M
 
 
 # Metropolis Monte Carlo Step
@@ -72,7 +25,6 @@ def potts_mc_step(spins, J, h, beta, q):
 
     Returns:
         spins: 更新后的自旋状态
-        rng: 更新后的随机数生成器
     """
 
     # 获取形状
@@ -86,8 +38,6 @@ def potts_mc_step(spins, J, h, beta, q):
     spins_new = spins.copy()
     spins_new[i, j] = np.random.randint(1, q + 1)
 
-    # 计算能量差
-    # dE = potts_energy(spins_new, J, h) - potts_energy(spins, J, h)
     # 直接计算能量差, 由于只改变了一个格点, 只需要计算该格点的能量差
     Eij_old = 0
     Eij_new = 0
@@ -122,12 +72,13 @@ def potts_mc_mt(T, spins, J, h, q, n_steps, n_step_save=100, path="./Potts_Data"
         spins: 自旋状态,shape=(N, N)的数组,其中N是格子数目
         J: 相邻自旋互相作用能量强度
         h: 外磁场强度
+        q: 自旋状态数目
         n_steps: 模拟步数
         n_step_save: 保存间隔
+        path: 保存路径
 
     Returns:
-        spins: 更新后的自旋状态
-        rng: 更新后的随机数生成器
+        spin_history: 自旋状态轨迹
     """
 
     # 进行n_steps步模拟
@@ -145,16 +96,16 @@ def potts_mc_mh(h, spins, J, T, q, n_steps, n_step_save=100):
     """Metropolis 蒙特卡洛模拟
 
     Args:
-        T: 温度
+        h: 外磁场强度
         spins: 自旋状态,shape=(N, N)的数组,其中N是格子数目
         J: 相邻自旋互相作用能量强度
-        h: 外磁场强度
+        T: 温度
+        q: 自旋状态数目
         n_steps: 模拟步数
         n_step_save: 保存间隔
 
     Returns:
-        spins: 更新后的自旋状态
-        rng: 更新后的随机数生成器
+        spin_history: 自旋状态轨迹
     """
 
     # 进行n_steps步模拟
@@ -183,6 +134,7 @@ def potts_simulate_parallel_temp(
         T_series: 温度序列
         n_steps: 模拟步数
         n_step_save: 保存间隔
+        path: 保存路径
     """
     import multiprocessing as mt
 
@@ -255,17 +207,19 @@ spins = np.array(spins, dtype=np.int8)
 # time
 import os
 
+# create folder if not exist
 if not os.path.exists("./Potts_Data"):
     os.mkdir("./Potts_Data")
 if not os.path.exists("./Potts_Data_h"):
     os.mkdir("./Potts_Data_h")
 if not os.path.exists("./Potts_Data_critical"):
     os.mkdir("./Potts_Data_critical")
+
+# run simulation
 print(" Simulation of different temperatures")
 potts_simulate_parallel_temp(spins, J, h, q, k, T_series, n_steps, n_step_save=1000)
 print(" Simulation of different magnetic fields")
 T = [0.75, 1.2, 2, 3]
-from tqdm import trange
-
 for i in trange(len(T)):
     potts_simulate_parallel_h(spins, J, h_series, q, k, T[i], n_steps, n_step_save=1000)
+print(" End of simulation.")
