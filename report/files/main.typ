@@ -52,7 +52,7 @@
     (
       title: "Data Availability",
       content: [
-        Associated code repository is available on #link("https://github.com/simpeg/tle-finitevolume")[GitHub].
+        Associated code repository is available on #link("https://github.com/xiaoxuan-yu/Potts_MC_Simulation")[GitHub].
       ],
     ),
     (
@@ -114,7 +114,7 @@ $ T_c = J/(k_B ln(1+sqrt(q))) $
 where $k_B$ is the Boltzmann constant and $q$ is the number of spin states. In the simulation approach, the critical temperature can be determined by finding a peak in the specific heat.
 
 = Problem setup
-In the simulation, a 2D square lattice without periodic boundary is used as the target system. The lattice has size $N = 32$. For simplicity, we set the coupling constant $J = 1$ and the magnetic field strength $h = 0$. Besides we use the reduced temperature s.t. $k_B = 1$. $q$ is set to 3, which means the spin variable can take on 3 different values, 1, 2, and 3. 
+In the simulation, a 2D square lattice with periodic boundary is used as the target system. The lattice has size $N = 32$. For simplicity, we set the coupling constant $J = 1$ and the magnetic field strength $h = 0$. Besides we use the reduced temperature s.t. $k_B = 1$. $q$ is set to 3, which means the spin variable can take on 3 different values, 1, 2, and 3. 
 
 The initial state of the system is randomly generated. The simulation is performed under different reduced temperatures $T$ from 0.5 to 2.5. For each temperature, the system is evolved for 500,0000 steps. The trajectory of the system is recorded every 100 steps and thus the physical quantities are calculated with the same interval.
 
@@ -195,7 +195,7 @@ def potts_simulate_parallel(init_spin, J, h, q, k, T_series, n_steps, n_step_sav
     pool.map(potts_mc_partial, T_series)
     return 0
 ```
-The `potts_mc_partial` function is a partial function of the `potts_mc_mt` function, which is the main loop of the Metropolis algorithm, in which parameters other than temperature are all fixed. The `potts_mc_partial` function is then mapped to the `T_series` array, which contains the temperatures of the simulation. The `potts_mc_partial` function is run in parallel with 8 processes by using the `multiprocessing.Pool` class.
+The `potts_mc_partial` function is a partial function of the `potts_mc_mt` function, which is the main loop of the Metropolis algorithm, in which parameters other than temperature are all fixed. The `potts_mc_partial` function is then mapped to the `T_series` array, which contains the temperatures of the simulation. The `potts_mc_partial` function is run in parallel with 8 processes by using the `multiprocessing.Pool` class. The parallelization of $h$ can be implemented in a similar way.
 
 == Data analysis
 The interested physical quantities are calculated by averaging over the last half of the trajectory. The implementation is shown is the attached notebook `Post-simulation.ipynb`. Simply speaking, the data is loaded from the disk and then averaged over the last half of the trajectory. For internal energy, specific heat, and magnetization, it is done naively. For the characteristic length, the spatial correlation function is calculated first and then the characteristic length is calculated by fitting the correlation function using `scipy.optimize.fitting_curve` with the exponential function.

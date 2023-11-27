@@ -4,6 +4,12 @@ from functools import partial
 from numba import njit, prange, objmode, jit
 
 
+# Finding neighbors in PBC
+@jit
+def finding_neighbor(N, i, j):
+    return [((i + 1) % N, j), ((1 - i) % N, j), (i, (j + 1) % N), (i, (j - 1) % N)]
+
+
 # setup of 2D q-state Potts model
 @njit
 def potts_energy(spins, J, h):
@@ -22,8 +28,8 @@ def potts_energy(spins, J, h):
     N = spins.shape[0]
 
     # 计算相邻自旋互作用能
-    E_J = J * np.sum(spins[:-1, :] == spins[1:, :])
-    E_J += J * np.sum(spins[:, :-1] == spins[:, 1:])
+    E_J = J * np.sum(spins == np.roll(spins, 1, 0))
+    E_J += J * np.sum(spins == np.roll(spins, 1, 1))
     # 计算外磁场能
     E_J += h * np.sum(spins)
 
@@ -85,30 +91,12 @@ def potts_mc_step(spins, J, h, beta, q):
     # 直接计算能量差, 由于只改变了一个格点, 只需要计算该格点的能量差
     Eij_old = 0
     Eij_new = 0
-    # 计算与上方格点的能量差
-    if i > 0:
-        if spins[i, j] == spins[i - 1, j]:
-            Eij_old -= J
-        if spins_new[i, j] == spins_new[i - 1, j]:
-            Eij_new -= J
-    # 计算与下方格点的能量差
-    if i < N - 1:
-        if spins[i, j] == spins[i + 1, j]:
-            Eij_old -= J
-        if spins_new[i, j] == spins_new[i + 1, j]:
-            Eij_new -= J
-    # 计算与左方格点的能量差
-    if j > 0:
-        if spins[i, j] == spins[i, j - 1]:
-            Eij_old -= J
-        if spins_new[i, j] == spins_new[i, j - 1]:
-            Eij_new -= J
-    # 计算与右方格点的能量差
-    if j < N - 1:
-        if spins[i, j] == spins[i, j + 1]:
-            Eij_old -= J
-        if spins_new[i, j] == spins_new[i, j + 1]:
-            Eij_new -= J
+    # 计算与相邻格点的能量差
+    neighbors = finding_neighbor(N, i, j)
+    for neighbor in neighbors:
+        Eij_old -= J * (spins[i, j] == spins[neighbor[0], neighbor[1]])
+        Eij_new -= J * (spins_new[i, j] == spins[neighbor[0], neighbor[1]])
+
     # 计算与外磁场的能量差
     Eij_old -= h * spins[i, j]
     Eij_new -= h * spins_new[i, j]
@@ -153,7 +141,38 @@ def potts_mc_mt(T, spins, J, h, q, n_steps, n_step_save=100):
     return spin_history
 
 
-def potts_simulate_parallel(init_spin, J, h, q, k, T_series, n_steps, n_step_save=100):
+def potts_mc_mh(h, spins, J, T, q, n_steps, n_step_save=100):
+    """Metropolis 蒙特卡洛模拟
+
+    Args:
+        T: 温度
+        spins: 自旋状态,shape=(N, N)的数组,其中N是格子数目
+        J: 相邻自旋互相作用能量强度
+        h: 外磁场强度
+        n_steps: 模拟步数
+        n_step_save: 保存间隔
+
+    Returns:
+        spins: 更新后的自旋状态
+        rng: 更新后的随机数生成器
+    """
+
+    # 进行n_steps步模拟
+    spin_history = []
+    for i in range(n_steps):
+        beta = 1 / (k * T)
+        spins = potts_mc_step(spins, J, h, beta, q)
+        if i % n_step_save == 0:
+            spin_history.append(spins)
+    np.save(
+        "./Potts_Data_h/spin_history_{}_{:.2f}_{:.2f}.npy".format(q, h, T), spin_history
+    )
+    return spin_history
+
+
+def potts_simulate_parallel_temp(
+    init_spin, J, h, q, k, T_series, n_steps, n_step_save=1000
+):
     """并行模拟Potts模型并保存轨迹
     Args:
         init_spin: 初始自旋状态,shape=(N, N)的数组,其中N是格子数目
@@ -184,6 +203,39 @@ def potts_simulate_parallel(init_spin, J, h, q, k, T_series, n_steps, n_step_sav
     return 0
 
 
+def potts_simulate_parallel_h(
+    init_spin, J, h_series, q, k, T, n_steps, n_step_save=100
+):
+    """并行模拟Potts模型并保存轨迹
+    Args:
+        init_spin: 初始自旋状态,shape=(N, N)的数组,其中N是格子数目
+        J: 相邻自旋互相作用能量强度
+        h_series: 外磁场强度序列
+        q: 自旋状态数目
+        k: 玻尔兹曼常数
+        T: 温度
+        n_steps: 模拟步数
+        n_step_save: 保存间隔
+    """
+    import multiprocessing as mt
+
+    pool = mt.Pool(8)
+
+    # partial function
+    potts_mc_partial = partial(
+        potts_mc_mh,
+        spins=init_spin,
+        J=J,
+        T=T,
+        q=q,
+        n_steps=n_steps,
+        n_step_save=n_step_save,
+    )
+    # run simulation
+    pool.map(potts_mc_partial, h_series)
+    return 0
+
+
 # perform MC simulation
 # setup
 q = 3
@@ -192,7 +244,8 @@ J = 1
 h = 0
 k = 1
 T_series = np.linspace(0.5, 2.5, 100)
-n_steps = 5000000
+h_series = np.logspace(0, 1, 20)
+n_steps = 10000000
 # initial state
 spins = np.random.randint(1, q + 1, size=(N, N))
 spins = np.array(spins, dtype=np.int8)
@@ -202,4 +255,13 @@ import os
 
 if not os.path.exists("./Potts_Data"):
     os.mkdir("./Potts_Data")
-potts_simulate_parallel(spins, J, h, q, k, T_series, n_steps, n_step_save=100)
+if not os.path.exists("./Potts_Data_h"):
+    os.mkdir("./Potts_Data_h")
+print(" Simulation of different temperatures")
+potts_simulate_parallel_temp(spins, J, h, q, k, T_series, n_steps, n_step_save=1000)
+print(" Simulation of different magnetic fields")
+potts_simulate_parallel_h(spins, J, h_series, q, k, 0.75, n_steps, n_step_save=1000)
+potts_simulate_parallel_h(spins, J, h_series, q, k, 1.2, n_steps, n_step_save=1000)
+potts_simulate_parallel_h(spins, J, h_series, q, k, 2, n_steps, n_step_save=1000)
+potts_simulate_parallel_h(spins, J, h_series, q, k, 3, n_steps, n_step_save=1000)
+print(" Simulation finished")

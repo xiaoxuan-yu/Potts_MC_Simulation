@@ -1,1 +1,3 @@
 simulation/Potts_Data
+simulation/Potts_Data_h
+*.npy
