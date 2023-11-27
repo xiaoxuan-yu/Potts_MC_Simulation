@@ -1,3 +1,4 @@
 simulation/Potts_Data
 simulation/Potts_Data_h
+simulation/Potts_Data_critical
 *.npy

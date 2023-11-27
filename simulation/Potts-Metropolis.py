@@ -114,7 +114,7 @@ def potts_mc_step(spins, J, h, beta, q):
 
 
 @jit(forceobj=True)
-def potts_mc_mt(T, spins, J, h, q, n_steps, n_step_save=100):
+def potts_mc_mt(T, spins, J, h, q, n_steps, n_step_save=100, path="./Potts_Data"):
     """Metropolis 蒙特卡洛模拟
 
     Args:
@@ -137,7 +137,7 @@ def potts_mc_mt(T, spins, J, h, q, n_steps, n_step_save=100):
         spins = potts_mc_step(spins, J, h, beta, q)
         if i % n_step_save == 0:
             spin_history.append(spins)
-    np.save("./Potts_Data/spin_history_{}_{:.2f}.npy".format(q, T), spin_history)
+    np.save(path + "/spin_history_{}_{:.2f}.npy".format(q, T), spin_history)
     return spin_history
 
 
@@ -165,13 +165,13 @@ def potts_mc_mh(h, spins, J, T, q, n_steps, n_step_save=100):
         if i % n_step_save == 0:
             spin_history.append(spins)
     np.save(
-        "./Potts_Data_h/spin_history_{}_{:.2f}_{:.2f}.npy".format(q, h, T), spin_history
+        "./Potts_Data_h/spin_history_{}_{}_{:.2f}.npy".format(q, h, T), spin_history
     )
     return spin_history
 
 
 def potts_simulate_parallel_temp(
-    init_spin, J, h, q, k, T_series, n_steps, n_step_save=1000
+    init_spin, J, h, q, k, T_series, n_steps, n_step_save=1000, path="./Potts_Data"
 ):
     """并行模拟Potts模型并保存轨迹
     Args:
@@ -197,6 +197,7 @@ def potts_simulate_parallel_temp(
         q=q,
         n_steps=n_steps,
         n_step_save=n_step_save,
+        path=path,
     )
     # run simulation
     pool.map(potts_mc_partial, T_series)
@@ -219,7 +220,7 @@ def potts_simulate_parallel_h(
     """
     import multiprocessing as mt
 
-    pool = mt.Pool(8)
+    pool = mt.Pool(6)
 
     # partial function
     potts_mc_partial = partial(
@@ -244,7 +245,8 @@ J = 1
 h = 0
 k = 1
 T_series = np.linspace(0.5, 2.5, 100)
-h_series = np.logspace(0, 1, 20)
+h_series = np.logspace(-5, 1, 50)
+h_series = np.insert(h_series, 0, 0)
 n_steps = 10000000
 # initial state
 spins = np.random.randint(1, q + 1, size=(N, N))
@@ -257,11 +259,13 @@ if not os.path.exists("./Potts_Data"):
     os.mkdir("./Potts_Data")
 if not os.path.exists("./Potts_Data_h"):
     os.mkdir("./Potts_Data_h")
+if not os.path.exists("./Potts_Data_critical"):
+    os.mkdir("./Potts_Data_critical")
 print(" Simulation of different temperatures")
 potts_simulate_parallel_temp(spins, J, h, q, k, T_series, n_steps, n_step_save=1000)
 print(" Simulation of different magnetic fields")
-potts_simulate_parallel_h(spins, J, h_series, q, k, 0.75, n_steps, n_step_save=1000)
-potts_simulate_parallel_h(spins, J, h_series, q, k, 1.2, n_steps, n_step_save=1000)
-potts_simulate_parallel_h(spins, J, h_series, q, k, 2, n_steps, n_step_save=1000)
-potts_simulate_parallel_h(spins, J, h_series, q, k, 3, n_steps, n_step_save=1000)
-print(" Simulation finished")
+T = [0.75, 1.2, 2, 3]
+from tqdm import trange
+
+for i in trange(len(T)):
+    potts_simulate_parallel_h(spins, J, h_series, q, k, T[i], n_steps, n_step_save=1000)
