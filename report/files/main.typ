@@ -231,7 +231,7 @@ The interested physical quantities are calculated by averaging over the last hal
 
 For the characteristic length, the spatial correlation function is calculated first by convoluting the spin matrix $Sigma$
 $ Gamma(k) eq.triple expval(Sigma * "roll"(Sigma,plus.minus k,"axix=0 or 1")) + expval(Sigma) * expval("roll"(Sigma,plus.minus k,"axix=0 or 1")) $
-where $A*B eq.def sum_(i,j) A_(i j)B_(i j)$. Then the characteristic length is calculated by linear fitting the correlation function after taking the logarithm to $Gamma(k)$.
+where $A*B eq.def sum_(i,j) A_(i j)B_(i j)$. Then the characteristic length is calculated by linear fitting the correlation function using `np.optimize.curve_fit`.
 
 The limiting behavior around the critical temperature is also studied by linear fitting the data around the critical temperature using log-log scale.
 
@@ -311,7 +311,7 @@ table below
   align: center,
   [], [Left side], [Right side],
   [$gamma$], [$1.06$], [$0.78$],
-  [$delta$], [$0.22$], [$0.27$],
+  [$delta$], [$0.56$], [$0.31$],
 ))
 It is necessary to emphasize the fact that the system is not well converged at lower temperature, which means that the scaling exponent may not be accurate.
 
