@@ -92,6 +92,7 @@ def potts_mc_mt(T, spins, J, h, q, n_steps, n_step_save=100, path="./Potts_Data"
     return spin_history
 
 
+@jit(forceobj=True)
 def potts_mc_mh(h, spins, J, T, q, n_steps, n_step_save=100):
     """Metropolis 蒙特卡洛模拟
 
@@ -172,7 +173,7 @@ def potts_simulate_parallel_h(
     """
     import multiprocessing as mt
 
-    pool = mt.Pool(6)
+    pool = mt.Pool(8)
 
     # partial function
     potts_mc_partial = partial(
